@@ -1,0 +1,164 @@
+package com.livefront.parcelableserializersample.serializer
+
+import android.os.Build
+import android.os.Parcel
+import android.os.Parcelable
+import android.util.Base64
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildSerialDescriptor
+import kotlinx.serialization.descriptors.element
+import kotlinx.serialization.encoding.AbstractDecoder
+import kotlinx.serialization.encoding.AbstractEncoder
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlin.reflect.KClass
+
+/**
+ * A custom [KSerializer] for serializing and deserializing [Parcelable] classes.
+ *
+ * This serializer is compatible with Jetpack Compose type-safe navigation routes. It allows for
+ * complex [Parcelable] types to be easily serialized without needing to specify a `NavType` for
+ * all non-primitive properties and properties nested within those types.
+ *
+ * For example:
+ *
+ * ```
+ * @Parcelize
+ * @Serializable(with = CustomRoute.Serializer::class)
+ * data class CustomRoute(
+ *     val data: Data,
+ * ): Parcelable {
+ *     class Serializer : ParcelableSerializer<CustomRoute>(CustomRoute::class)
+ * }
+ * ```
+ *
+ * where `Data` is a complex type implementing `Parcelable`.
+ *
+ * In addition, this serializer provides support for directly serializing to the parent types of a
+ * sealed class when using `SavedStateHandle.toRoute()`. In order to achieve this while also
+ * ensuring each route is unique, a  subclass of this serializer should be defined for each parent
+ * and child type.
+ *
+ * Given the following type:
+ *
+ * ```
+ * @Parcelize
+ * @Serializable(with = Parent.Serializer::class)
+ * sealed class Parent : Parcelable {
+ *     class Serializer : ParcelableSerializer<Parent>(Parent::class)
+ *
+ *     @Parcelize
+ *     @Serializable(with = Parent.Child1::class)
+ *     data class Child1(
+ *         val data1: Data1,
+ *     ) : Parent() {
+ *         class Serializer : ParcelableSerializer<Child1>(Child1::class)
+ *     }
+ *
+ *     @Parcelize
+ *     @Serializable(with = Child2.Serializer::class)
+ *     data class Child2(
+ *         val data2: Data2,
+ *     ) : Parent() {
+ *         class Serializer : ParcelableSerializer<Child2>(Child2::class)
+ *     }
+ * ```
+ *
+ * the route information for a navigation to the `Child1` destination could be derived using both:
+ *
+ * ```
+ * savedStateHandle.toRoute<Parent.Child1>()
+ * ```
+ *
+ * as well as
+ *
+ * ```
+ * when (savedStateHandle.toRoute<Parent>()) {
+ *     is Child1 -> // ...
+ *     is Child2 -> // ...
+ * }
+ * ```
+ *
+ * The latter is useful in cases where the same `ViewModel` is used to handle these routes.
+ */
+@OptIn(
+    InternalSerializationApi::class,
+    ExperimentalSerializationApi::class,
+)
+open class ParcelableSerializer<T : Parcelable>(
+    private val kClass: KClass<T>
+) : KSerializer<T> {
+
+    override val descriptor: SerialDescriptor
+        get() = buildSerialDescriptor(
+            serialName = kClass.qualifiedName!!,
+            kind = PolymorphicKind.SEALED,
+        ) {
+            element<String>("encodedData")
+        }
+
+    override fun deserialize(decoder: Decoder): T {
+        val abstractDecoder = decoder as AbstractDecoder
+
+        abstractDecoder.decodeElementIndex(descriptor)
+        val encodedString = abstractDecoder.decodeString()
+
+        return encodedString.toParcelable()
+            ?: throw IllegalStateException("Invalid decoding for ${kClass.qualifiedName}.")
+    }
+
+    override fun serialize(encoder: Encoder, value: T) {
+        val abstractEncoder = encoder as AbstractEncoder
+
+        val valueAsString = value.toEncodedString()
+
+        abstractEncoder.encodeElement(descriptor, 0)
+        abstractEncoder.encodeString(valueAsString)
+    }
+
+    // Helpers for encoding Parcelable data
+
+    private fun Parcelable.toBytes(): ByteArray {
+        val parcelable = this
+        val parcel = Parcel.obtain().apply {
+            writeParcelable(parcelable, Parcelable.PARCELABLE_WRITE_RETURN_VALUE)
+        }
+        return parcel
+            .marshall()
+            .also { parcel.recycle() }
+    }
+
+    private fun Parcelable.toEncodedString(): String =
+        Base64.encodeToString(toBytes(), Base64.URL_SAFE)
+
+    private fun <T> ByteArray.toParcelable(): T? {
+        val bytes = this
+        val parcel = Parcel.obtain().apply {
+            unmarshall(bytes, 0, bytes.size)
+            setDataPosition(0)
+        }
+        val value = try {
+            @Suppress("UNCHECKED_CAST")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                parcel.readParcelable(
+                    ParcelableSerializer::class.java.classLoader,
+                    kClass.java,
+                )
+            } else {
+                parcel.readParcelable(ParcelableSerializer::class.java.classLoader)
+            } as T?
+        } catch (_: IllegalArgumentException) {
+            null
+        } catch (_: IllegalStateException) {
+            null
+        }
+        parcel.recycle()
+        return value
+    }
+
+    private fun <T> String.toParcelable(): T? = Base64.decode(this, Base64.URL_SAFE).toParcelable()
+}

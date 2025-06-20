@@ -11,10 +11,10 @@ import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.descriptors.element
-import kotlinx.serialization.encoding.AbstractDecoder
-import kotlinx.serialization.encoding.AbstractEncoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.encoding.decodeStructure
+import kotlinx.serialization.encoding.encodeStructure
 import kotlin.reflect.KClass
 
 /**
@@ -101,23 +101,25 @@ open class ParcelableSerializer<T : Parcelable>(
             element<String>("encodedData")
         }
 
-    override fun deserialize(decoder: Decoder): T {
-        val abstractDecoder = decoder as AbstractDecoder
-
-        abstractDecoder.decodeElementIndex(descriptor)
-        val encodedString = abstractDecoder.decodeString()
-
-        return encodedString.toParcelable()
-            ?: throw IllegalStateException("Invalid decoding for ${kClass.qualifiedName}.")
-    }
+    override fun deserialize(decoder: Decoder): T =
+        decoder.decodeStructure(descriptor) {
+            var encodedString: String? = null
+            while (true) {
+                when (decodeElementIndex(descriptor)) {
+                    0 -> encodedString = decodeStringElement(descriptor, 0)
+                    else -> break
+                }
+            }
+            encodedString
+                ?.toParcelable<T>()
+                ?: throw IllegalStateException("Invalid decoding for ${kClass.qualifiedName}.")
+        }
 
     override fun serialize(encoder: Encoder, value: T) {
-        val abstractEncoder = encoder as AbstractEncoder
-
         val valueAsString = value.toEncodedString()
-
-        abstractEncoder.encodeElement(descriptor, 0)
-        abstractEncoder.encodeString(valueAsString)
+        encoder.encodeStructure(descriptor) {
+            encodeStringElement(descriptor, 0, valueAsString)
+        }
     }
 
     // Helpers for encoding Parcelable data

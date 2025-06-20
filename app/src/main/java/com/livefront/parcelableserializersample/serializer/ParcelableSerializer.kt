@@ -4,12 +4,9 @@ import android.os.Build
 import android.os.Parcel
 import android.os.Parcelable
 import android.util.Base64
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.buildSerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.descriptors.element
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
@@ -85,18 +82,13 @@ import kotlin.reflect.KClass
  *
  * The latter is useful in cases where the same `ViewModel` is used to handle these routes.
  */
-@OptIn(
-    InternalSerializationApi::class,
-    ExperimentalSerializationApi::class,
-)
 open class ParcelableSerializer<T : Parcelable>(
     private val kClass: KClass<T>
 ) : KSerializer<T> {
 
     override val descriptor: SerialDescriptor
-        get() = buildSerialDescriptor(
+        get() = buildClassSerialDescriptor(
             serialName = kClass.qualifiedName!!,
-            kind = PolymorphicKind.SEALED,
         ) {
             element<String>("encodedData")
         }

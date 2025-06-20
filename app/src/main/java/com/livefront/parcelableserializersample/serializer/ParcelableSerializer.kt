@@ -119,7 +119,7 @@ open class ParcelableSerializer<T : Parcelable>(
     private fun Parcelable.toBytes(): ByteArray {
         val parcelable = this
         val parcel = Parcel.obtain().apply {
-            writeParcelable(parcelable, Parcelable.PARCELABLE_WRITE_RETURN_VALUE)
+            writeParcelable(parcelable, 0)
         }
         return parcel
             .marshall()

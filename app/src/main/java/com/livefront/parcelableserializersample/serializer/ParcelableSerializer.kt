@@ -102,9 +102,19 @@ open class ParcelableSerializer<T : Parcelable>(
                     else -> break
                 }
             }
+            if (encodedString == null) {
+                throw IllegalStateException(
+                    "Invalid decoding for ${kClass.qualifiedName}.\n" +
+                        "Encoded data is missing. Decoding attempted for data not first encoded " +
+                        "with this serializer."
+                )
+            }
             encodedString
-                ?.toParcelable<T>()
-                ?: throw IllegalStateException("Invalid decoding for ${kClass.qualifiedName}.")
+                .toParcelable<T>()
+                ?: throw IllegalStateException(
+                    "Invalid decoding for ${kClass.qualifiedName}.\n" +
+                        "Encoded data cannot be decoded into the given type."
+                )
         }
 
     override fun serialize(encoder: Encoder, value: T) {

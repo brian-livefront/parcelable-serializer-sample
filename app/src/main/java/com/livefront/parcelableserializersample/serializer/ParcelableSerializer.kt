@@ -29,7 +29,7 @@ import kotlin.reflect.KClass
  * data class CustomRoute(
  *     val data: Data,
  * ): Parcelable {
- *     class Serializer : ParcelableSerializer<CustomRoute>(CustomRoute::class)
+ *     object Serializer : ParcelableSerializer<CustomRoute>(CustomRoute::class)
  * }
  * ```
  *
@@ -46,14 +46,14 @@ import kotlin.reflect.KClass
  * @Parcelize
  * @Serializable(with = Parent.Serializer::class)
  * sealed class Parent : Parcelable {
- *     class Serializer : ParcelableSerializer<Parent>(Parent::class)
+ *     object Serializer : ParcelableSerializer<Parent>(Parent::class)
  *
  *     @Parcelize
  *     @Serializable(with = Parent.Child1::class)
  *     data class Child1(
  *         val data1: Data1,
  *     ) : Parent() {
- *         class Serializer : ParcelableSerializer<Child1>(Child1::class)
+ *         object Serializer : ParcelableSerializer<Child1>(Child1::class)
  *     }
  *
  *     @Parcelize
@@ -61,7 +61,7 @@ import kotlin.reflect.KClass
  *     data class Child2(
  *         val data2: Data2,
  *     ) : Parent() {
- *         class Serializer : ParcelableSerializer<Child2>(Child2::class)
+ *         object Serializer : ParcelableSerializer<Child2>(Child2::class)
  *     }
  * ```
  *

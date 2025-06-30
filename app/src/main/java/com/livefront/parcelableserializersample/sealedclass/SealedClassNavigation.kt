@@ -11,12 +11,12 @@ import kotlinx.serialization.Serializable
 @Parcelize
 @Serializable(with = SealedClassRoute.Serializer::class)
 sealed class SealedClassRoute : Parcelable {
-    class Serializer : ParcelableSerializer<SealedClassRoute>(SealedClassRoute::class)
+    object Serializer : ParcelableSerializer<SealedClassRoute>(SealedClassRoute::class)
 
     @Parcelize
     @Serializable(with = Type1.Serializer::class)
     data object Type1 : SealedClassRoute() {
-        class Serializer : ParcelableSerializer<Type1>(Type1::class)
+        object Serializer : ParcelableSerializer<Type1>(Type1::class)
     }
 
     @Parcelize
@@ -24,7 +24,7 @@ sealed class SealedClassRoute : Parcelable {
     data class Type2(
         val data: String
     ) : SealedClassRoute() {
-        class Serializer : ParcelableSerializer<Type2>(Type2::class)
+        object Serializer : ParcelableSerializer<Type2>(Type2::class)
     }
 }
 

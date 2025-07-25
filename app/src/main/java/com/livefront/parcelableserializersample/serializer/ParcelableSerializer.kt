@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.Parcel
 import android.os.Parcelable
 import android.util.Base64
+import androidx.core.os.ParcelCompat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
@@ -145,16 +146,13 @@ open class ParcelableSerializer<T : Parcelable>(
             unmarshall(bytes, 0, bytes.size)
             setDataPosition(0)
         }
+        @Suppress("UNCHECKED_CAST")
         val value = try {
-            @Suppress("UNCHECKED_CAST")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                parcel.readParcelable(
-                    ParcelableSerializer::class.java.classLoader,
-                    kClass.java,
-                )
-            } else {
-                parcel.readParcelable(ParcelableSerializer::class.java.classLoader)
-            } as T?
+            ParcelCompat.readParcelable(
+                parcel,
+                ParcelableSerializer::class.java.classLoader,
+                kClass.java,
+            ) as T?
         } catch (_: IllegalArgumentException) {
             null
         } catch (_: IllegalStateException) {
